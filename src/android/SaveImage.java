@@ -5,9 +5,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.SecurityException;
 import java.nio.channels.FileChannel;
 
-import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import org.apache.cordova.CallbackContext;
@@ -32,7 +32,7 @@ public class SaveImage extends CordovaPlugin {
     private final String WRITE_EXTERNAL_STORAGE = Manifest.permission.WRITE_EXTERNAL_STORAGE;
     private CallbackContext callbackContext;
     private String filePath;
-    
+
 
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
@@ -51,27 +51,27 @@ public class SaveImage extends CordovaPlugin {
      * @param callbackContext   callback id for optional progress reports
      *
      * args[0] filePath         file path string to image file to be saved to gallery
-     */  
+     */
     private void saveImageToGallery(JSONArray args, CallbackContext callback) throws JSONException {
     	this.filePath = args.getString(0);
     	this.callbackContext = callback;
         Log.d("SaveImage", "SaveImage in filePath: " + filePath);
-        
+
         if (filePath == null || filePath.equals("")) {
         	callback.error("Missing filePath");
             return;
         }
-        
+
         if (PermissionHelper.hasPermission(this, WRITE_EXTERNAL_STORAGE)) {
         	Log.d("SaveImage", "Permissions already granted, or Android version is lower than 6");
         	performImageSave();
         } else {
         	Log.d("SaveImage", "Requesting permissions for WRITE_EXTERNAL_STORAGE");
         	PermissionHelper.requestPermission(this, WRITE_PERM_REQUEST_CODE, WRITE_EXTERNAL_STORAGE);
-        }      
+        }
     }
-    
-    
+
+
     /**
      * Save image to device gallery
      */
@@ -113,9 +113,14 @@ public class SaveImage extends CordovaPlugin {
         }
 
         // Generate image file name using current date and time
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssSSS").format(new Date());
-        File newFile = new File(dstFolder.getPath() + File.separator + "IMG_" + timeStamp + ".jpg");
-
+        File newFile = new File(dstFolder.getPath() + File.separator + "IMG_" + srcFile.getName() + ".jpg");
+        try {
+            if (newFile.isFile()) {
+                return newFile;
+            }
+        } catch (SecurityException e) {
+            //user has no wright to read file
+        }
         // Read and write image files
         FileChannel inChannel = null;
         FileChannel outChannel = null;
@@ -169,7 +174,7 @@ public class SaveImage extends CordovaPlugin {
         mediaScanIntent.setData(contentUri);
         cordova.getActivity().sendBroadcast(mediaScanIntent);
     }
-    
+
 
     /**
      * Callback from PermissionHelper.requestPermission method
@@ -182,7 +187,7 @@ public class SaveImage extends CordovaPlugin {
 				return;
 			}
 		}
-		
+
 		switch (requestCode) {
 		case WRITE_PERM_REQUEST_CODE:
 			Log.d("SaveImage", "User granted the permission for WRITE_EXTERNAL_STORAGE");
